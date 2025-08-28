@@ -34,11 +34,6 @@ class BaseController(QObject, LoggerMixin):
         self._views = {}   # 关联的视图字典
         self._event_handlers = {}  # 事件处理器字典
         self._initialized = False
-        
-        # 延迟初始化定时器
-        self._init_timer = QTimer()
-        self._init_timer.setSingleShot(True)
-        self._init_timer.timeout.connect(self._delayed_init)
     
     def add_model(self, name: str, model) -> None:
         """
@@ -155,12 +150,12 @@ class BaseController(QObject, LoggerMixin):
         self.status_changed.emit(message)
     
     def init_controller(self) -> None:
-        """初始化控制器（延迟执行）"""
+        """初始化控制器（直接执行）"""
         if not self._initialized:
-            self._init_timer.start(10)  # 10ms后执行初始化
+            self._direct_init()
     
-    def _delayed_init(self) -> None:
-        """延迟初始化"""
+    def _direct_init(self) -> None:
+        """直接初始化"""
         try:
             self.init_models()
             self.init_views()
@@ -200,10 +195,6 @@ class BaseController(QObject, LoggerMixin):
     def cleanup(self) -> None:
         """清理资源"""
         try:
-            # 停止定时器
-            if self._init_timer.isActive():
-                self._init_timer.stop()
-            
             # 从模型移除观察者
             for model in self._models.values():
                 if hasattr(model, 'remove_observer'):
@@ -282,13 +273,17 @@ class ControllerManager(QObject, LoggerMixin):
     
     def cleanup_all_controllers(self) -> None:
         """清理所有控制器"""
-        for name, controller in self._controllers.items():
+        # 使用list()复制字典的items，避免在迭代过程中修改字典
+        controllers_to_cleanup = list(self._controllers.items())
+        
+        for name, controller in controllers_to_cleanup:
             try:
                 controller.cleanup()
                 self.logger.debug(f"控制器已清理: {name}")
             except Exception as e:
                 self.logger.error(f"清理控制器失败 {name}: {e}")
         
+        # 清空字典
         self._controllers.clear()
         self._controller_dependencies.clear()
 

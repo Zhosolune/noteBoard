@@ -31,9 +31,12 @@ class NoteController(BaseController):
         super().__init__(parent)
         
         self._current_note_id = None
-        self._auto_save_timer = QTimer()
-        self._auto_save_timer.setSingleShot(True)
-        self._auto_save_timer.timeout.connect(self._auto_save_current_note)
+        # 暂时禁用自动保存定时器，简化逻辑
+        # self._auto_save_timer = QTimer()
+        # self._auto_save_timer.setSingleShot(True)
+        # self._auto_save_timer.timeout.connect(self._auto_save_current_note)
+        
+        self._auto_save_timer = None  # 禁用自动保存
         
         self._pending_changes = {}  # 待保存的变更
         self._auto_save_enabled = True
@@ -386,7 +389,7 @@ class NoteController(BaseController):
     
     def schedule_auto_save(self, note_id: int, data: Dict[str, Any]) -> None:
         """
-        安排自动保存
+        安排自动保存（暂时禁用定时器）
         
         Args:
             note_id: 笔记ID
@@ -395,17 +398,16 @@ class NoteController(BaseController):
         if not self._auto_save_enabled:
             return
         
-        # 更新待保存的变更
+        # 直接保存，不使用定时器
         if note_id not in self._pending_changes:
             self._pending_changes[note_id] = {}
         
         self._pending_changes[note_id].update(data)
         
-        # 重启自动保存定时器
-        self._auto_save_timer.stop()
-        self._auto_save_timer.start(self._auto_save_interval)
+        # 直接保存，不等待定时器
+        self._auto_save_current_note()
         
-        self.logger.debug(f"安排自动保存: note_id={note_id}")
+        self.logger.debug(f"直接保存: note_id={note_id}")
     
     def _auto_save_current_note(self) -> None:
         """自动保存当前笔记"""
@@ -431,21 +433,18 @@ class NoteController(BaseController):
             self.log_error(e, "自动保存异常")
     
     def set_auto_save_enabled(self, enabled: bool) -> None:
-        """设置自动保存启用状态"""
+        """设置自动保存启用状态（已禁用）"""
         self._auto_save_enabled = enabled
-        
-        if not enabled and self._auto_save_timer.isActive():
-            self._auto_save_timer.stop()
+        # 自动保存已禁用，无需操作
+        pass
     
     def set_auto_save_interval(self, interval_ms: int) -> None:
-        """设置自动保存间隔"""
-        self._auto_save_interval = max(1000, interval_ms)  # 最少1秒
+        """设置自动保存间隔（已禁用）"""
+        self._auto_save_interval = max(1000, interval_ms)  # 保持接口兼容性
     
     def force_save_all(self) -> None:
         """强制保存所有待保存的变更"""
-        if self._auto_save_timer.isActive():
-            self._auto_save_timer.stop()
-        
+        # 直接保存，无需检查定时器
         self._save_pending_changes()
     
     # 事件处理器
@@ -500,8 +499,22 @@ class NoteController(BaseController):
         self.emit_status_changed(f"笔记删除成功: {title}")
     
     def cleanup(self) -> None:
-        """清理资源"""
-        # 保存待保存的变更
-        self.force_save_all()
-        
-        super().cleanup()
+        """清理资源（符合用户强制退出偏好）"""
+        try:
+            # 直接保存所有待保存的变更
+            self.force_save_all()
+            
+            # 清理待保存的变更
+            self._pending_changes.clear()
+            
+            self.logger.debug("NoteController 清理完成")
+            
+        except Exception as e:
+            # 即使清理失败也要继续，符合强制退出偏好
+            self.logger.error(f"NoteController 清理失败: {e}")
+        finally:
+            # 调用父类的cleanup方法
+            try:
+                super().cleanup()
+            except Exception as e:
+                self.logger.error(f"父类清理失败: {e}")

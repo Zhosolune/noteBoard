@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QListWidget, QListWidgetItem, QTextEdit, QLineEdit
+    QListWidget, QListWidgetItem, QTextEdit, QLineEdit, QStackedWidget
 )
 from PySide6.QtGui import QFont
 
@@ -18,7 +18,7 @@ from qfluentwidgets import (
     SegmentedWidget, ToolButton, DropDownPushButton, RoundMenu, Action,
     ListView, TextEdit, LineEdit, BodyLabel, CaptionLabel, TitleLabel,
     InfoBadge, FlowLayout, MessageBox, InfoBar, InfoBarPosition,
-    FluentIcon as FIF, MenuAnimationType
+    FluentIcon as FIF, MenuAnimationType, IconWidget
 )
 
 from utils.logger import LoggerMixin
@@ -45,15 +45,14 @@ class NoteInterface(ScrollArea, LoggerMixin):
         self._notes_data = []
         self._is_editing = False
         
-        # 自动保存定时器
-        self.auto_save_timer = QTimer()
-        self.auto_save_timer.setSingleShot(True)
-        self.auto_save_timer.timeout.connect(self._auto_save_note)
-        
         # 初始化界面
         self._init_ui()
         self._init_toolbar()
         self._init_content_area()
+        
+        # 连接视图切换信号（在内容区域创建后）
+        if hasattr(self, 'view_stack'):
+            self.view_stack.currentChanged.connect(self._on_view_stack_changed)
         
         self.logger.debug("笔记管理界面初始化完成")
     
@@ -73,6 +72,43 @@ class NoteInterface(ScrollArea, LoggerMixin):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
     
+    # def _init_toolbar(self) -> None:
+    #     """初始化工具栏"""
+    #     toolbar_widget = QWidget()
+    #     toolbar_layout = QHBoxLayout(toolbar_widget)
+    #     toolbar_layout.setContentsMargins(0, 0, 0, 0)
+    #     toolbar_layout.setSpacing(10)
+        
+    #     # 搜索框
+    #     self.search_edit = SearchLineEdit()
+    #     self.search_edit.setPlaceholderText("搜索笔记...")
+    #     self.search_edit.setFixedWidth(300)
+    #     self.search_edit.textChanged.connect(self._on_search_text_changed)
+        
+    #     # 新建笔记按钮
+    #     self.new_note_btn = PrimaryPushButton("新建笔记")
+    #     self.new_note_btn.setIcon(FIF.ADD)
+    #     self.new_note_btn.clicked.connect(self._create_new_note)
+        
+    #     # 视图切换
+    #     self.view_toggle = SegmentedWidget()
+    #     self.view_toggle.addItem('list', "列表视图", lambda: self._switch_view('list'))
+    #     self.view_toggle.addItem('card', "卡片视图", lambda: self._switch_view('card'))
+    #     self.view_toggle.setCurrentItem('list')
+        
+    #     # 更多操作按钮
+    #     self.more_btn = DropDownPushButton("更多操作")
+    #     self.more_btn.setIcon(FIF.MORE)
+    #     self._init_more_menu()
+        
+    #     toolbar_layout.addWidget(self.search_edit)
+    #     toolbar_layout.addStretch()
+    #     toolbar_layout.addWidget(self.view_toggle)
+    #     toolbar_layout.addWidget(self.new_note_btn)
+    #     toolbar_layout.addWidget(self.more_btn)
+        
+    #     self.main_layout.addWidget(toolbar_widget)
+
     def _init_toolbar(self) -> None:
         """初始化工具栏"""
         toolbar_widget = QWidget()
@@ -91,12 +127,15 @@ class NoteInterface(ScrollArea, LoggerMixin):
         self.new_note_btn.setIcon(FIF.ADD)
         self.new_note_btn.clicked.connect(self._create_new_note)
         
-        # 视图切换
+        # 视图切换（SegmentedWidget）
         self.view_toggle = SegmentedWidget()
-        self.view_toggle.addItem('list', "列表视图", lambda: self._switch_view('list'))
-        self.view_toggle.addItem('card', "卡片视图", lambda: self._switch_view('card'))
-        self.view_toggle.setCurrentItem('list')
+        self.view_toggle.addItem("list", "列表视图")
+        self.view_toggle.addItem("card", "卡片视图")
+        self.view_toggle.setCurrentItem("list")
         
+        # 用信号处理切换逻辑
+        self.view_toggle.currentItemChanged.connect(self._switch_view)
+
         # 更多操作按钮
         self.more_btn = DropDownPushButton("更多操作")
         self.more_btn.setIcon(FIF.MORE)
@@ -109,6 +148,7 @@ class NoteInterface(ScrollArea, LoggerMixin):
         toolbar_layout.addWidget(self.more_btn)
         
         self.main_layout.addWidget(toolbar_widget)
+
     
     def _init_more_menu(self) -> None:
         """初始化更多操作菜单"""
@@ -142,12 +182,12 @@ class NoteInterface(ScrollArea, LoggerMixin):
         # 左侧笔记列表
         self.notes_list_widget = self._create_notes_list_widget()
         
-        # 右侧笔记详情
-        self.note_detail_widget = self._create_note_detail_widget()
+        # 右侧视图切换区域（使用QStackedWidget）
+        self.view_container = self._create_view_container()
         
         # 添加到分割器
         self.splitter.addWidget(self.notes_list_widget)
-        self.splitter.addWidget(self.note_detail_widget)
+        self.splitter.addWidget(self.view_container)
         
         # 设置分割比例
         self.splitter.setSizes([350, 600])
@@ -181,7 +221,7 @@ class NoteInterface(ScrollArea, LoggerMixin):
         layout.addWidget(filter_widget)
         
         # 笔记列表
-        self.notes_list = ListView()
+        self.notes_list = QListWidget()
         self.notes_list.itemClicked.connect(self._on_note_item_clicked)
         layout.addWidget(self.notes_list, 1)
         
@@ -192,8 +232,40 @@ class NoteInterface(ScrollArea, LoggerMixin):
         
         return widget
     
+    def _create_view_container(self) -> QWidget:
+        """创建视图切换容器（使用QStackedWidget的正确实现）"""
+        container = CardWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # 创建堆叠组件（用于切换不同视图）
+        self.view_stack = QStackedWidget()
+        
+        # 创建列表视图（默认视图）
+        self.list_view_widget = self._create_note_detail_widget()
+        self.list_view_widget.setObjectName('listView')
+        
+        # 创建卡片视图
+        self.card_view_widget = self._create_card_view_widget()
+        self.card_view_widget.setObjectName('cardView')
+        
+        # 添加到堆叠组件
+        self.view_stack.addWidget(self.list_view_widget)
+        self.view_stack.addWidget(self.card_view_widget)
+        
+        # 设置默认视图
+        self.view_stack.setCurrentWidget(self.list_view_widget)
+        
+        # 添加到容器
+        layout.addWidget(self.view_stack)
+        
+        # 保存引用以保持兼容性
+        self.note_detail_widget = self.list_view_widget
+        
+        return container
+    
     def _create_note_detail_widget(self) -> QWidget:
-        """创建笔记详情组件"""
         widget = CardWidget()
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 15, 15, 15)
@@ -234,6 +306,62 @@ class NoteInterface(ScrollArea, LoggerMixin):
         self._set_editor_enabled(False)
         
         return widget
+    
+    def _create_card_view_widget(self) -> QWidget:
+        """创建卡片视图组件"""
+        widget = CardWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(15, 15, 15, 15)
+        
+        # 卡片视图标题
+        card_title = BodyLabel("卡片视图")
+        card_title.setStyleSheet("font-weight: bold; font-size: 16px;")
+        layout.addWidget(card_title)
+        
+        # 卡片容器（使用滚动区域）
+        scroll_area = ScrollArea()
+        scroll_content = QWidget()
+        self.card_layout = FlowLayout(scroll_content)
+        self.card_layout.setContentsMargins(10, 10, 10, 10)
+        self.card_layout.setHorizontalSpacing(15)
+        self.card_layout.setVerticalSpacing(15)
+        
+        scroll_area.setWidget(scroll_content)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
+        layout.addWidget(scroll_area, 1)
+        
+        # 初始化时显示提示
+        self._show_card_view_placeholder()
+        
+        return widget
+    
+    def _show_card_view_placeholder(self) -> None:
+        """显示卡片视图占位符"""
+        placeholder = CardWidget()
+        placeholder.setFixedSize(200, 150)
+        placeholder_layout = QVBoxLayout(placeholder)
+        placeholder_layout.setAlignment(Qt.AlignCenter)
+        
+        icon = IconWidget(FIF.VIEW)
+        icon.setFixedSize(48, 48)
+        icon.setStyleSheet("color: gray;")
+        
+        text = BodyLabel("卡片视图模式")
+        text.setAlignment(Qt.AlignCenter)
+        text.setStyleSheet("color: gray;")
+        
+        desc = CaptionLabel("选择笔记在此显示")
+        desc.setAlignment(Qt.AlignCenter)
+        desc.setStyleSheet("color: gray; font-size: 12px;")
+        
+        placeholder_layout.addWidget(icon)
+        placeholder_layout.addWidget(text)
+        placeholder_layout.addWidget(desc)
+        
+        self.card_layout.addWidget(placeholder)
     
     def _create_note_header(self) -> QWidget:
         """创建笔记头部"""
@@ -362,6 +490,10 @@ class NoteInterface(ScrollArea, LoggerMixin):
             
             self.notes_list.addItem(item)
             self.notes_list.setItemWidget(item, item_widget)
+        
+        # 同时更新卡片视图（如果当前是卡片视图）
+        if hasattr(self, 'view_stack') and self.view_stack.currentWidget() == self.card_view_widget:
+            self._update_card_view()
     
     def _create_note_item_widget(self, note: Dict[str, Any]) -> QWidget:
         """创建笔记列表项组件"""
@@ -619,8 +751,10 @@ class NoteInterface(ScrollArea, LoggerMixin):
             self._is_editing = True
             self._update_save_status(False)
             
-            # 启动自动保存定时器
-            self.auto_save_timer.start(2000)  # 2秒后自动保存
+            # 直接通知控制器处理自动保存
+            if self.controller:
+                title = self.title_edit.text()
+                self.controller.schedule_auto_save(self._current_note_id, {'title': title})
     
     def _on_content_changed(self) -> None:
         """内容变更事件"""
@@ -629,8 +763,10 @@ class NoteInterface(ScrollArea, LoggerMixin):
             self._update_save_status(False)
             self._update_word_count()
             
-            # 启动自动保存定时器
-            self.auto_save_timer.start(2000)  # 2秒后自动保存
+            # 直接通知控制器处理自动保存
+            if self.controller:
+                content = self.content_edit.toPlainText()
+                self.controller.schedule_auto_save(self._current_note_id, {'content': content})
     
     def _on_search_text_changed(self, text: str) -> None:
         """搜索文本变更事件"""
@@ -648,9 +784,109 @@ class NoteInterface(ScrollArea, LoggerMixin):
             self.refresh_notes_list()
     
     def _switch_view(self, view_type: str) -> None:
-        """切换视图类型"""
-        # TODO: 实现卡片视图
+        """切换视图类型（正确实现）"""
         self.logger.debug(f"切换到 {view_type} 视图")
+        
+        if view_type == 'list':
+            # 切换到列表视图
+            self.view_stack.setCurrentWidget(self.list_view_widget)
+            self.note_detail_widget = self.list_view_widget
+        elif view_type == 'card':
+            # 切换到卡片视图
+            self.view_stack.setCurrentWidget(self.card_view_widget)
+            self.note_detail_widget = self.card_view_widget
+            self._update_card_view()
+        
+        # 可以在这里添加其他视图切换逻辑
+        
+    def _update_card_view(self) -> None:
+        """更新卡片视图内容"""
+        # 清除现有的卡片（使用更安全的方法）
+        # 获取所有子控件
+        children_to_remove = []
+        for i in range(self.card_layout.count()):
+            item = self.card_layout.itemAt(i)
+            if item and item.widget():
+                children_to_remove.append(item.widget())
+        
+        # 删除所有子控件
+        for widget in children_to_remove:
+            self.card_layout.removeWidget(widget)
+            widget.deleteLater()
+        
+        if not self._notes_data:
+            # 没有笔记时显示占位符
+            self._show_card_view_placeholder()
+        else:
+            # 为每个笔记创建卡片
+            for note in self._notes_data:
+                card = self._create_note_card(note)
+                self.card_layout.addWidget(card)
+    
+    def _create_note_card(self, note: Dict[str, Any]) -> CardWidget:
+        """为笔记创建卡片组件"""
+        card = CardWidget()
+        card.setFixedSize(250, 180)
+        card.setCursor(Qt.PointingHandCursor)
+        
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)
+        
+        # 标题
+        title = BodyLabel(note.get('title', '无标题')[:20] + ('...' if len(note.get('title', '')) > 20 else ''))
+        title.setStyleSheet("font-weight: bold; font-size: 14px;")
+        layout.addWidget(title)
+        
+        # 内容预览
+        content_preview = note.get('content', '')[:60]
+        if len(note.get('content', '')) > 60:
+            content_preview += '...'
+        
+        content_label = CaptionLabel(content_preview)
+        content_label.setWordWrap(True)
+        content_label.setStyleSheet("color: gray; font-size: 12px;")
+        layout.addWidget(content_label, 1)
+        
+        # 标签区域
+        if note.get('tags'):
+            tags_container = QWidget()
+            tags_layout = FlowLayout(tags_container)
+            tags_layout.setContentsMargins(0, 0, 0, 0)
+            
+            for tag in note.get('tags', [])[:3]:  # 最多显示3个标签
+                tag_badge = InfoBadge(tag['name'])
+                tag_badge.setCustomBackgroundColor(tag['color'], tag['color'])
+                tags_layout.addWidget(tag_badge)
+            
+            layout.addWidget(tags_container)
+        
+        # 时间信息
+        time_label = CaptionLabel(note.get('updated_at', ''))
+        time_label.setStyleSheet("color: gray; font-size: 11px;")
+        layout.addWidget(time_label)
+        
+        # 点击事件
+        card.mousePressEvent = lambda event: self._on_note_card_clicked(note['id'])
+        
+        return card
+    
+    def _on_note_card_clicked(self, note_id: int) -> None:
+        """笔记卡片点击事件"""
+        # 切换到列表视图并选中笔记
+        self.view_toggle.setCurrentItem('list')
+        self._switch_view('list')
+        self._select_note(note_id)
+    
+    def _on_view_stack_changed(self, index: int) -> None:
+        """视图堆叠组件变化事件"""
+        # 同步SegmentedWidget的选中状态
+        current_widget = self.view_stack.widget(index)
+        if current_widget:
+            if current_widget.objectName() == 'listView':
+                self.view_toggle.setCurrentItem('list')
+            elif current_widget.objectName() == 'cardView':
+                self.view_toggle.setCurrentItem('card')
     
     def _sort_notes(self, sort_type: str) -> None:
         """排序笔记"""
@@ -703,3 +939,19 @@ class NoteInterface(ScrollArea, LoggerMixin):
             self._clear_editor()
             self._current_note_id = None
         self.refresh_notes_list()
+    
+    def cleanup(self) -> None:
+        """清理资源"""
+        try:
+            # 如果正在编辑，保存当前笔记
+            if self._is_editing and self._current_note_id and self.controller:
+                # 直接保存，不使用定时器
+                title = self.title_edit.text() if hasattr(self, 'title_edit') else ''
+                content = self.content_edit.toPlainText() if hasattr(self, 'content_edit') else ''
+                if title or content:
+                    self.controller.update_note(self._current_note_id, {'title': title, 'content': content})
+            
+            self.logger.debug("笔记界面清理完成")
+            
+        except Exception as e:
+            self.log_error(e, "笔记界面清理失败")

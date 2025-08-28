@@ -39,7 +39,6 @@ class MainController(BaseController):
         
         self.app = app
         self.config = config_manager
-        self.logger = logger
         
         # 核心组件
         self.db_manager = None
@@ -52,6 +51,9 @@ class MainController(BaseController):
         
         # 控制器管理器
         self.controller_manager = ControllerManager()
+        
+        # 清理状态标志，防止递归调用
+        self._is_cleaning_up = False
         
         # 子控制器
         self.note_controller = None
@@ -130,11 +132,11 @@ class MainController(BaseController):
             self.tag_controller = TagController()
             self.window_controller = WindowController(self.main_window)
             
-            # 注册到控制器管理器
-            self.controller_manager.register_controller('main', self, [])
-            self.controller_manager.register_controller('note', self.note_controller, ['main'])
-            self.controller_manager.register_controller('tag', self.tag_controller, ['main'])
-            self.controller_manager.register_controller('window', self.window_controller, ['main'])
+            # 注册子控制器到控制器管理器（不包括MainController自己）
+            # 注意：不再注册MainController，避免递归调用
+            self.controller_manager.register_controller('note', self.note_controller, [])
+            self.controller_manager.register_controller('tag', self.tag_controller, [])
+            self.controller_manager.register_controller('window', self.window_controller, [])
             
             # 为控制器添加模型
             self.note_controller.add_model('note', self.note_model)
@@ -183,17 +185,8 @@ class MainController(BaseController):
         """显示主窗口"""
         try:
             if self.main_window:
-                # 检查是否启用边缘隐藏
-                edge_hide_enabled = self.settings_model.get_setting('window.edge_hide_enabled', False)
-                
-                if edge_hide_enabled:
-                    # 启用边缘隐藏功能
-                    self.window_controller.enable_edge_hiding(True)
-                    # 不直接显示窗口，等待边缘触发
-                else:
-                    # 正常显示窗口
-                    self.main_window.show_window()
-                
+                # 禁用边缘隐藏功能，直接显示窗口
+                self.main_window.show_window()
                 self.logger.info("主窗口已准备就绪")
             
         except Exception as e:
@@ -291,28 +284,54 @@ class MainController(BaseController):
             return OperationResult.error_result(f"获取统计信息失败: {str(e)}")
     
     def cleanup(self) -> None:
-        """清理资源"""
+        """清理资源（强制退出模式）"""
+        # 防止重复调用
+        if hasattr(self, '_is_cleaning_up') and self._is_cleaning_up:
+            self.logger.debug("正在清理中，跳过重复调用")
+            return
+            
+        self._is_cleaning_up = True
+        
         try:
-            self.logger.info("开始清理应用程序资源")
+            self.logger.info("开始强制清理应用程序资源")
             
-            # 清理控制器
-            if hasattr(self, 'controller_manager') and self.controller_manager:
-                self.controller_manager.cleanup_all_controllers()
+            # 尝试清理子控制器，但不让失败阻止退出
+            try:
+                if hasattr(self, 'controller_manager') and self.controller_manager:
+                    self.controller_manager.cleanup_all_controllers()
+            except Exception as e:
+                self.logger.error(f"清理控制器失败，忽略: {e}")
             
-            # 关闭数据库连接
-            if self.db_manager:
-                self.db_manager.close()
+            # 尝试关闭数据库
+            try:
+                if hasattr(self, 'db_manager') and self.db_manager:
+                    self.db_manager.close()
+            except Exception as e:
+                self.logger.error(f"关闭数据库失败，忽略: {e}")
             
-            # 保存配置
-            if self.config:
-                self.config.save_config()
+            # 尝试保存配置
+            try:
+                if hasattr(self, 'config') and self.config:
+                    self.config.save_config()
+            except Exception as e:
+                self.logger.error(f"保存配置失败，忽略: {e}")
             
             self.logger.info("应用程序资源清理完成")
             
         except Exception as e:
-            self.log_error(e, "清理应用程序资源失败")
+            self.logger.error(f"清理过程出现异常，忽略: {e}")
         
-        super().cleanup()
+        # 强制退出，不管上面是否成功
+        self.logger.info("执行强制退出")
+        try:
+            if hasattr(self, 'app') and self.app:
+                self.app.quit()
+        except:
+            pass
+        
+        # 最后的保障
+        import sys
+        sys.exit(0)
     
     # 事件处理器
     def _handle_controller_error(self, error_type: str, message: str) -> None:
@@ -336,8 +355,9 @@ class MainController(BaseController):
         """应用程序关闭处理"""
         self.logger.info("应用程序正在关闭")
         
-        # 执行清理操作
-        self.cleanup()
-        
-        # 退出应用程序
-        QTimer.singleShot(100, self.app.quit)
+        try:
+            # 执行清理操作
+            self.cleanup()
+            
+        except Exception as e:
+            self.log_error(e, "应用程序关闭处理失败")

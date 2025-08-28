@@ -13,7 +13,7 @@ from PySide6.QtGui import QPixmap, QPainter, QPainterPath
 from qfluentwidgets import (
     ScrollArea, CardWidget, ImageLabel, BodyLabel, TitleLabel, 
     CaptionLabel, PushButton, PrimaryPushButton, InfoBadge,
-    FlowLayout, ProgressRing, StatisticsWidget, ElevatedCardWidget,
+    FlowLayout, ProgressRing, ElevatedCardWidget,
     IconWidget, FluentIcon as FIF, InfoBarPosition, InfoBar
 )
 
@@ -45,10 +45,8 @@ class HomeInterface(ScrollArea, LoggerMixin):
         self._init_ui()
         self._init_animations()
         
-        # 定时刷新数据
-        self.refresh_timer = QTimer()
-        self.refresh_timer.timeout.connect(self.refresh_data)
-        self.refresh_timer.start(30000)  # 30秒刷新一次
+        # 初始加载数据（不使用定时器）
+        self.refresh_data()
         
         self.logger.debug("首页界面初始化完成")
     
@@ -534,3 +532,18 @@ class HomeInterface(ScrollArea, LoggerMixin):
             duration=3000,
             parent=self
         )
+    
+    def cleanup(self) -> None:
+        """清理资源"""
+        try:
+            # 停止所有动画
+            if hasattr(self, '_card_animations'):
+                for animation in self._card_animations:
+                    if animation.state() == QPropertyAnimation.Running:
+                        animation.stop()
+                self._card_animations.clear()
+            
+            self.logger.debug("首页界面清理完成")
+            
+        except Exception as e:
+            self.log_error(e, "首页界面清理失败")

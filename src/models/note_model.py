@@ -25,7 +25,7 @@ class NoteModel(BaseModel):
             新笔记的ID，失败返回None
         """
         # 验证必需字段
-        required_fields = ['title']
+        required_fields: list[str] = ['title']
         if not self.validate_data(data, required_fields):
             return None
         

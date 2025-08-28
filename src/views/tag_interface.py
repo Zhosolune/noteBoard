@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout
 
 from qfluentwidgets import (
     ScrollArea, CardWidget, PrimaryPushButton, PushButton,
-    LineEdit, ColorPicker, FlowLayout, InfoBadge, BodyLabel,
+    LineEdit, ColorPickerButton, FlowLayout, InfoBadge, BodyLabel,
     CaptionLabel, MessageBox, InfoBar, InfoBarPosition,
     FluentIcon as FIF
 )
@@ -97,7 +97,8 @@ class TagInterface(ScrollArea, LoggerMixin):
         self.tag_name_edit.setPlaceholderText("输入标签名称...")
         
         # 颜色选择器
-        self.color_picker = ColorPicker()
+        from PySide6.QtGui import QColor
+        self.color_picker = ColorPickerButton(QColor(255, 0, 0), "标签颜色")
         
         # 创建按钮
         self.create_tag_btn = PrimaryPushButton("创建标签")

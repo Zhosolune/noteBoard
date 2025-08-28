@@ -11,6 +11,7 @@ Version: 1.0.0
 
 import sys
 import os
+import signal
 from pathlib import Path
 
 # 添加src目录到Python路径
@@ -26,6 +27,12 @@ from utils.config_manager import ConfigManager
 from utils.logger import setup_logger
 
 
+def signal_handler(signum, frame):
+    """信号处理函数"""
+    print(f"\n接收到信号 {signum}，正在退出...")
+    sys.exit(0)
+
+
 def main():
     """主函数"""
     # 设置高DPI缩放
@@ -37,7 +44,8 @@ def main():
     
     # 创建应用实例
     app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(False)  # 关闭窗口不退出程序，支持托盘模式
+    # app.setQuitOnLastWindowClosed(False)  # 关闭窗口不退出程序，支持托盘模式
+    app.setQuitOnLastWindowClosed(True)  # 关闭窗口时退出程序（简化逻辑）
     
     # 初始化日志系统
     logger = setup_logger()
@@ -77,8 +85,11 @@ def main():
     
     finally:
         # 清理资源
-        if 'main_controller' in locals():
-            main_controller.cleanup()
+        try:
+            if 'main_controller' in locals() and main_controller:
+                main_controller.cleanup()
+        except Exception as e:
+            print(f"清理资源失败: {e}")
 
 
 if __name__ == "__main__":

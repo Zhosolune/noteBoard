@@ -7,13 +7,13 @@
 
 from typing import Optional, Dict, Any
 from PySide6.QtCore import Qt, QSize, Signal, QTimer
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 from PySide6.QtGui import QIcon
 
 from qfluentwidgets import (
     FluentWindow, NavigationItemPosition, FluentIcon as FIF,
     setTheme, Theme, isDarkTheme, qconfig, InfoBar, InfoBarPosition,
-    SystemTrayIcon, RoundMenu, Action, MessageBox
+    SystemTrayMenu, RoundMenu, Action, MessageBox
 )
 
 from utils.logger import LoggerMixin
@@ -54,12 +54,13 @@ class MainWindow(FluentWindow, LoggerMixin):
         # 窗口状态
         self._is_pinned = False  # 是否置顶
         self._is_edge_hidden = False  # 是否边缘隐藏
+        self._force_quit = False  # 是否强制退出
         
         # 初始化界面
         self._init_window()
         self._init_interfaces()
         self._init_navigation()
-        self._init_system_tray()
+        # self._init_system_tray()  # 暂时禁用系统托盘功能
         self._load_window_settings()
         
         self.logger.info("主窗口初始化完成")
@@ -141,9 +142,9 @@ class MainWindow(FluentWindow, LoggerMixin):
         )
         
         # 设置默认页面为首页
-        self.navigationInterface.setDefaultRouteKey(
-            self._interfaces['home'].objectName()
-        )
+        # self.navigationInterface.setDefaultRouteKey(
+        #     self._interfaces['home'].objectName()
+        # )
         
         # 连接导航切换信号
         self.navigationInterface.displayModeChanged.connect(
@@ -155,20 +156,13 @@ class MainWindow(FluentWindow, LoggerMixin):
     def _init_system_tray(self) -> None:
         """初始化系统托盘"""
         try:
-            # 创建托盘图标
-            self.tray_icon = SystemTrayIcon(self)
-            
-            # 设置托盘图标
-            try:
-                self.tray_icon.setIcon(QIcon("resources/icons/tray_icon.ico"))
-            except:
-                # 使用默认图标
-                self.tray_icon.setIcon(self.windowIcon())
-            
-            self.tray_icon.setToolTip("轻量笔记管理器")
+            # 检查系统是否支持托盘
+            if not QSystemTrayIcon.isSystemTrayAvailable():
+                self.logger.warning("系统不支持托盘功能")
+                return
             
             # 创建托盘菜单
-            self.tray_menu = RoundMenu(parent=self)
+            self.tray_menu = SystemTrayMenu(parent=self)
             
             # 添加菜单项
             show_action = Action(FIF.VIEW, "显示主窗口")
@@ -191,6 +185,18 @@ class MainWindow(FluentWindow, LoggerMixin):
             exit_action = Action(FIF.CLOSE, "退出程序")
             exit_action.triggered.connect(self.close_application)
             self.tray_menu.addAction(exit_action)
+            
+            # 创建托盘图标
+            self.tray_icon = QSystemTrayIcon(self)
+            
+            # 设置托盘图标
+            try:
+                self.tray_icon.setIcon(QIcon("resources/icons/tray_icon.ico"))
+            except:
+                # 使用默认图标
+                self.tray_icon.setIcon(self.windowIcon())
+            
+            self.tray_icon.setToolTip("轻量笔记管理器")
             
             # 设置托盘菜单
             self.tray_icon.setContextMenu(self.tray_menu)
@@ -463,8 +469,23 @@ class MainWindow(FluentWindow, LoggerMixin):
         )
         
         if msg_box.exec():
+            self.logger.info("用户确认退出应用程序")
+            
+            # 标记为强制退出，禁用托盘功能
+            self._force_quit = True
+            
+            # 隐藏托盘图标
+            if self.tray_icon:
+                self.tray_icon.hide()
+            
+            # 清理界面资源
+            self._cleanup_interfaces()
+            
+            # 发出关闭信号
             self.window_closing.emit()
-            QApplication.instance().quit()
+            
+            # 关闭窗口
+            self.close()
     
     def switch_to_interface(self, interface_name: str) -> None:
         """
@@ -482,7 +503,7 @@ class MainWindow(FluentWindow, LoggerMixin):
     # 事件处理器
     def _on_tray_icon_activated(self, reason) -> None:
         """托盘图标激活事件处理"""
-        if reason == SystemTrayIcon.ActivationReason.DoubleClick:
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             if self.isVisible():
                 self.hide_to_tray()
             else:
@@ -495,17 +516,37 @@ class MainWindow(FluentWindow, LoggerMixin):
     # Qt事件重写
     def closeEvent(self, event) -> None:
         """窗口关闭事件"""
+        self.logger.info("窗口关闭事件触发")
+        
         # 保存窗口设置
         self._save_window_settings()
         
-        # 如果有系统托盘，隐藏到托盘而不是关闭
-        if self.tray_icon and self.tray_icon.isVisible():
-            event.ignore()
-            self.hide_to_tray()
-        else:
-            # 发出关闭信号
-            self.window_closing.emit()
-            event.accept()
+        # 清理界面资源
+        self._cleanup_interfaces()
+        
+        # 发出关闭信号
+        self.window_closing.emit()
+        
+        # 接受关闭事件，允许窗口关闭
+        event.accept()
+        
+        self.logger.info("窗口关闭事件处理完成")
+    
+    def _cleanup_interfaces(self) -> None:
+        """清理所有界面资源"""
+        try:
+            for name, interface in self._interfaces.items():
+                if hasattr(interface, 'cleanup'):
+                    try:
+                        interface.cleanup()
+                        self.logger.debug(f"界面清理完成: {name}")
+                    except Exception as e:
+                        self.log_error(e, f"清理界面失败: {name}")
+            
+            self.logger.debug("所有界面清理完成")
+            
+        except Exception as e:
+            self.log_error(e, "清理界面失败")
     
     def changeEvent(self, event) -> None:
         """窗口状态变化事件"""

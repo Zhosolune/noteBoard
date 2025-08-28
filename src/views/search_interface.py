@@ -51,9 +51,10 @@ class SearchInterface(ScrollArea, LoggerMixin):
         
         # 搜索类型选择
         self.search_type = SegmentedWidget()
-        self.search_type.addItem('content', "内容搜索")
-        self.search_type.addItem('title', "标题搜索")  
-        self.search_type.addItem('tag', "标签搜索")
+        self.search_type.addItem('content', "内容搜索", lambda: self._switch_search_type('content'))
+        self.search_type.addItem('title', "标题搜索", lambda: self._switch_search_type('title'))  
+        self.search_type.addItem('tag', "标签搜索", lambda: self._switch_search_type('tag'))
+        self.search_type.setCurrentItem('content')
         layout.addWidget(self.search_type)
         
         # 结果列表
@@ -86,6 +87,14 @@ class SearchInterface(ScrollArea, LoggerMixin):
                 self.results_info.setText("搜索失败")
         except Exception as e:
             self.log_error(e, "搜索失败")
+    
+    def _switch_search_type(self, search_type: str):
+        """切换搜索类型"""
+        self.logger.debug(f"切换搜索类型: {search_type}")
+        # 重新执行搜索
+        current_text = self.search_edit.text()
+        if current_text.strip():
+            self._on_search(current_text)
     
     def _update_results(self):
         """更新搜索结果"""
