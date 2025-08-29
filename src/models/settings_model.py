@@ -7,7 +7,7 @@
 
 import json
 from typing import Any, Dict, List, Optional, Union
-from models.base_model import BaseModel, ModelEventType
+from src.models.base_model import BaseModel, ModelEventType
 
 
 class SettingsModel(BaseModel):

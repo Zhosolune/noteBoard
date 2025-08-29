@@ -6,7 +6,7 @@
 """
 
 from typing import Any, Dict, List, Optional
-from models.base_model import BaseModel, ModelEventType
+from src.models.base_model import BaseModel, ModelEventType
 
 
 class TagModel(BaseModel):

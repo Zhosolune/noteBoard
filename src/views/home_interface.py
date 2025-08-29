@@ -17,7 +17,8 @@ from qfluentwidgets import (
     IconWidget, FluentIcon as FIF, InfoBarPosition, InfoBar
 )
 
-from utils.logger import LoggerMixin
+# 使用以src为根的绝对导入，提升IDE跳转稳定性
+from src.utils.logger import LoggerMixin
 
 
 class HomeInterface(ScrollArea, LoggerMixin):

@@ -16,8 +16,8 @@ try:
 except ImportError:
     PYNPUT_AVAILABLE = False
 
-from controllers.base_controller import BaseController, OperationResult
-from utils.logger import LoggerMixin
+from src.controllers.base_controller import BaseController, OperationResult
+from src.utils.logger import LoggerMixin
 
 
 class WindowController(BaseController):

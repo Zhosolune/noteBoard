@@ -15,7 +15,7 @@ from qfluentwidgets import (
     FluentIcon as FIF
 )
 
-from utils.logger import LoggerMixin
+from src.utils.logger import LoggerMixin
 
 
 class SearchInterface(ScrollArea, LoggerMixin):

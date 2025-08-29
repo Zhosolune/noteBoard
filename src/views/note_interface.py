@@ -21,7 +21,7 @@ from qfluentwidgets import (
     FluentIcon as FIF, MenuAnimationType, IconWidget
 )
 
-from utils.logger import LoggerMixin
+from src.utils.logger import LoggerMixin
 
 
 class NoteInterface(ScrollArea, LoggerMixin):

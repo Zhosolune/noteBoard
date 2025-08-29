@@ -16,12 +16,12 @@ from qfluentwidgets import (
     SystemTrayMenu, RoundMenu, Action, MessageBox
 )
 
-from utils.logger import LoggerMixin
-from views.home_interface import HomeInterface
-from views.note_interface import NoteInterface  
-from views.tag_interface import TagInterface
-from views.search_interface import SearchInterface
-from views.settings_interface import SettingsInterface
+from src.utils.logger import LoggerMixin
+from src.views.home_interface import HomeInterface
+from src.views.note_interface import NoteInterface  
+from src.views.tag_interface import TagInterface
+from src.views.search_interface import SearchInterface
+from src.views.settings_interface import SettingsInterface
 
 
 class MainWindow(FluentWindow, LoggerMixin):

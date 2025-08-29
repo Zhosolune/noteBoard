@@ -10,17 +10,17 @@ from typing import Optional, Dict, Any
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
-from controllers.base_controller import BaseController, ControllerManager, OperationResult
-from controllers.note_controller import NoteController
-from controllers.tag_controller import TagController
-from controllers.window_controller import WindowController
+from src.controllers.base_controller import BaseController, ControllerManager, OperationResult
+from src.controllers.note_controller import NoteController
+from src.controllers.tag_controller import TagController
+from src.controllers.window_controller import WindowController
 
-from models.database_model import DatabaseManager
-from models.note_model import NoteModel
-from models.tag_model import TagModel
-from models.settings_model import SettingsModel
+from src.models.database_model import DatabaseManager
+from src.models.note_model import NoteModel
+from src.models.tag_model import TagModel
+from src.models.settings_model import SettingsModel
 
-from views.main_window import MainWindow
+from src.views.main_window import MainWindow
 
 
 class MainController(BaseController):

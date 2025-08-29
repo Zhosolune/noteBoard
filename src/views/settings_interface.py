@@ -13,7 +13,7 @@ from qfluentwidgets import (
     BodyLabel, CaptionLabel, FluentIcon as FIF
 )
 
-from utils.logger import LoggerMixin
+from src.utils.logger import LoggerMixin
 
 
 class SettingsInterface(ScrollArea, LoggerMixin):

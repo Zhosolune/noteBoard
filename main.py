@@ -13,18 +13,13 @@ import sys
 import os
 import signal
 from pathlib import Path
-
-# 添加src目录到Python路径
-src_path = Path(__file__).parent / "src"
-sys.path.insert(0, str(src_path))
-
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt, QDir
 from qfluentwidgets import setTheme, Theme
 
-from controllers.main_controller import MainController
-from utils.config_manager import ConfigManager
-from utils.logger import setup_logger
+from src.controllers.main_controller import MainController
+from src.utils.config_manager import ConfigManager
+from src.utils.logger import setup_logger
 
 
 def signal_handler(signum, frame):

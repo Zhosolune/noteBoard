@@ -11,8 +11,6 @@ from pathlib import Path
 
 # 添加src目录到路径
 project_root = Path(__file__).parent
-src_path = project_root / "src"
-sys.path.insert(0, str(src_path))
 
 def test_imports():
     """测试所有主要模块的导入"""
@@ -20,21 +18,21 @@ def test_imports():
         print("测试模块导入...")
         
         # 测试工具类导入
-        from utils.config_manager import ConfigManager
-        from utils.logger import setup_logger
+        from src.utils.config_manager import ConfigManager
+        from src.utils.logger import setup_logger
         print("✓ 工具类导入成功")
         
         # 测试模型导入
-        from models.database_model import DatabaseManager
-        from models.note_model import NoteModel
-        from models.tag_model import TagModel
-        from models.settings_model import SettingsModel
+        from src.models.database_model import DatabaseManager
+        from src.models.note_model import NoteModel
+        from src.models.tag_model import TagModel
+        from src.models.settings_model import SettingsModel
         print("✓ 模型类导入成功")
         
         # 测试控制器导入
-        from controllers.base_controller import BaseController
-        from controllers.note_controller import NoteController
-        from controllers.tag_controller import TagController
+        from src.controllers.base_controller import BaseController
+        from src.controllers.note_controller import NoteController
+        from src.controllers.tag_controller import TagController
         print("✓ 控制器类导入成功")
         
         return True
@@ -51,7 +49,7 @@ def test_database():
     try:
         print("\n测试数据库功能...")
         
-        from models.database_model import DatabaseManager
+        from src.models.database_model import DatabaseManager
         
         # 创建测试数据库
         test_db_path = project_root / "test_notes.db"
@@ -82,9 +80,9 @@ def test_models():
     try:
         print("\n测试模型功能...")
         
-        from models.database_model import DatabaseManager
-        from models.note_model import NoteModel
-        from models.tag_model import TagModel
+        from src.models.database_model import DatabaseManager
+        from src.models.note_model import NoteModel
+        from src.models.tag_model import TagModel
         
         # 创建测试数据库
         test_db_path = project_root / "test_notes.db"
@@ -141,7 +139,7 @@ def test_config():
     try:
         print("\n测试配置管理...")
         
-        from utils.config_manager import ConfigManager
+        from src.utils.config_manager import ConfigManager
         
         config = ConfigManager()
         

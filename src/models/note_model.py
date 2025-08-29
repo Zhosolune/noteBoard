@@ -8,7 +8,7 @@
 from typing import Any, Dict, List, Optional, Set
 from datetime import datetime
 
-from models.base_model import BaseModel, ModelEventType
+from src.models.base_model import BaseModel, ModelEventType
 
 
 class NoteModel(BaseModel):

@@ -8,8 +8,8 @@
 from typing import Any, Dict, List, Optional
 from PySide6.QtCore import Signal, QTimer
 
-from controllers.base_controller import BaseController, OperationResult
-from models.base_model import ModelEventType
+from src.controllers.base_controller import BaseController, OperationResult
+from src.models.base_model import ModelEventType
 
 
 class NoteController(BaseController):

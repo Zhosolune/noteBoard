@@ -9,8 +9,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Callable
 from PySide6.QtCore import QObject, Signal, QTimer
 
-from utils.logger import LoggerMixin
-from models.base_model import ModelEventType
+from src.utils.logger import LoggerMixin
+from src.models.base_model import ModelEventType
 
 
 class BaseController(QObject, LoggerMixin):

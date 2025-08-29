@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple, Dict, Union
 from contextlib import contextmanager
 
-from utils.logger import LoggerMixin
+from src.utils.logger import LoggerMixin
 
 
 class DatabaseManager(LoggerMixin):

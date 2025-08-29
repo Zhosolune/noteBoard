@@ -8,18 +8,11 @@
 import pytest
 import tempfile
 import os
-from pathlib import Path
 
-# 添加src路径
-import sys
-project_root = Path(__file__).parent.parent
-src_path = project_root / "src"
-sys.path.insert(0, str(src_path))
-
-from models.database_model import DatabaseManager
-from models.note_model import NoteModel
-from models.tag_model import TagModel
-from models.settings_model import SettingsModel
+from src.models.database_model import DatabaseManager
+from src.models.note_model import NoteModel
+from src.models.tag_model import TagModel
+from src.models.settings_model import SettingsModel
 
 
 @pytest.fixture
